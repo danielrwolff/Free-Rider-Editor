@@ -1,4 +1,9 @@
-class Line {
+class GameObject {
+  GameObject() {
+  }
+}
+
+class Line extends GameObject {
   int[] points;
   color c;
 
@@ -10,6 +15,7 @@ class Line {
   }
 
   Line(int x1, int y1, int x2, int y2) {
+    super();
     points = new int[4];
     points[0] = x1; 
     points[1] = y1; 
@@ -18,6 +24,7 @@ class Line {
   }
 
   Line(String _points) {
+    super();
     points = new int[4];
     for (int i = 0; i < 4; i++) {
       points[i] = int((split(_points, " "))[i]);
@@ -78,7 +85,7 @@ class SceneryLine extends Line {
     super(_points);
     c = color(150);
   }
-  
+
   SceneryLine(int x1, int y1, int x2, int y2) {
     super(x1, y1, x2, y2);
     c = color(150);

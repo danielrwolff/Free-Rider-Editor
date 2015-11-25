@@ -10,7 +10,7 @@ class UserInterface {
   String status;
   byte currentTool = 0;
 
-  byte numTools = 2;
+  byte numTools = 3;
 
   UserInterface() {
 
@@ -23,12 +23,13 @@ class UserInterface {
     tools = new Tool[numTools];
     tools[0] = new Line_Tool(0, 60, leftBarWidth, leftBarWidth, true);
     tools[1] = new Eraser_Tool(0, 110, leftBarWidth, leftBarWidth, true);
+    tools[2] = new Powerup_Tool(0, 160, leftBarWidth, leftBarWidth, true);
 
     extraButtons = new Button[2];
     extraButtons[0] = new RectButton(0, 0, leftBarWidth, leftBarWidth, true, frhdLogo);
     extraButtons[1] = new RectButton(width-15, 12, 15, 12, true);
     //extraButtons[2] = new RectButton(0, height-baseBarHeight, leftBarWidth, leftBarWidth, true, importExport);
-    
+
     importingExporting = new ImportExport_Tool(0, height-baseBarHeight, leftBarWidth, leftBarWidth, int(width*0.7), int(height/4), 150, 50, true, importExport);
     editorTypes = new Type_Tool(width-115, height-25, int(40/2));
   }
@@ -84,7 +85,7 @@ class UserInterface {
     fill(0);
     textSize(10);
     textAlign(RIGHT);
-    text("FRHD Community Concept Editor - V3.0 ", width, 12);
+    text("FRHD Community Concept Editor - " + version + " ", width, 12);
     text("Developed by Sono ", width, 24);
     //text("Framerate: " + int(frameRate), width, 24);
 
@@ -96,11 +97,19 @@ class UserInterface {
   void onMouseDown(int _x, int _y) {
     if (importingExporting.getImportingExporting()) 
       return;
-    tools[currentTool].doMouseDown(_x, _y);
+    if (_x > leftBarWidth && _y < height-baseBarHeight)
+      tools[currentTool].doMouseDown(_x, _y);
+  }
+
+  void onMouseDragged(int _x, int _y) {
+    if (importingExporting.getImportingExporting()) 
+      return;
+    tools[currentTool].doMouseDragged(_x, _y);
   }
 
   void onClick(int _x, int _y) {
     if (importingExporting.getImportingExporting()) {
+      importingExporting.doInternalClick(_x, _y);
       return;
     }
 
@@ -117,6 +126,10 @@ class UserInterface {
     } else if (tools[1].isClicked(_x, _y)) {
       currentTool = 1;
       editorTypes.setMultiType(true);
+      editorTypes.setPowerType(true);
+    } else if (tools[2].isClicked(_x, _y)) {
+      currentTool = 2;
+      editorTypes.setMultiType(false);
       editorTypes.setPowerType(true);
     } else if (_x > leftBarWidth && _y < height-baseBarHeight)
       tools[currentTool].doClick(_x, _y);

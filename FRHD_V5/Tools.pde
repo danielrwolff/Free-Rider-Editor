@@ -6,7 +6,7 @@ class Tool {
   boolean active;
   boolean[] activeLineTypes;
 
-  int correctedMouseX, correctedMouseY;
+  int correctedMouseX, correctedMouseY, cursorX, cursorY;
 
   Tool(int _x, int _y, boolean _active) {
     x = _x;
@@ -20,8 +20,10 @@ class Tool {
     cameraOffsetY = environment.getCameraOffsetY();
     cameraZoom = environment.getCameraZoom();
     activeLineTypes = ui.getLineTypes();
-    correctedMouseX = int((int((mouseX/cameraZoom)-cameraOffsetX) + cameraOffsetX)*cameraZoom);
-    correctedMouseY = int((int((mouseY/cameraZoom)-cameraOffsetY) + cameraOffsetY)*cameraZoom);
+    cursorX = int((mouseX/cameraZoom)-cameraOffsetX);
+    cursorY = int((mouseY/cameraZoom)-cameraOffsetY);
+    correctedMouseX = int((cursorX + cameraOffsetX)*cameraZoom);
+    correctedMouseY = int((cursorY + cameraOffsetY)*cameraZoom);
   }
 
   void draw() {
@@ -37,6 +39,8 @@ class Tool {
   void doClick(int _x, int _y) {
   }
   void doMouseDown(int _x, int _y) {
+  }
+  void doMouseDragged(int _x, int _y) {
   }
   void setShiftDown(boolean _down) {
   }
@@ -114,11 +118,11 @@ class Line_Tool extends SquareTool {
     if (mouseX > 50 && mouseY < height-50) {
       switch (stage) {
       case 0:
-        status = "First point: (" + str(int((mouseX/cameraZoom)-cameraOffsetX)) + "," + str(int((mouseY/cameraZoom)-cameraOffsetY)) + ")";
+        status = "First point: (" + cursorX + "," + cursorY + ")";
         break;
       case 1:
       case 2:
-        status = "Next point: (" + str(int((mouseX/cameraZoom)-cameraOffsetX)) + "," + str(int((mouseY/cameraZoom)-cameraOffsetY)) + ")";
+        status = "Next point: (" + cursorX + "," + cursorY + ") ; Line length: " + str(int(sqrt(sq(line.get(0) - cursorX) + sq(line.get(1) - cursorY)))) + " ; Angle: " + nf(degrees(atan2(line.get(1)-cursorY, line.get(0)-cursorX)), 0, 2);
         break;
       }
     }
@@ -150,9 +154,8 @@ class Line_Tool extends SquareTool {
     }
   }
 
-  void doClick(int _x, int _y) {
-    switch (stage) {
-    case 0:
+  void doMouseDown(int _x, int _y) {
+    if (stage == 0) {
       if (shiftDown) {
         line.append(prevLineX);
         line.append(prevLineY);
@@ -161,8 +164,11 @@ class Line_Tool extends SquareTool {
         stage = 1;
       line.append(int((_x/cameraZoom)-cameraOffsetX));
       line.append(int((_y/cameraZoom)-cameraOffsetY));
+    }
+  }
 
-      break;
+  void doClick(int _x, int _y) {
+    switch (stage) {
     case 1:
       line.append(int((_x/cameraZoom)-cameraOffsetX));
       line.append(int((_y/cameraZoom)-cameraOffsetY));
@@ -176,6 +182,7 @@ class Line_Tool extends SquareTool {
     }
   }
 
+
   void setShiftDown(boolean _down) {
     shiftDown = _down;
   }
@@ -186,7 +193,7 @@ class Line_Tool extends SquareTool {
   }
 
   void processLineData() {
-    environment.addLine(line.array(), activeLineTypes);
+    environment.addLine(line.array(), activeLineTypes, true);
     prevLineX = line.get(line.size()-2);
     prevLineY = line.get(line.size()-1);
     line.clear();
@@ -203,19 +210,23 @@ class Eraser_Tool extends SquareTool {
 
   byte eraserSize = 5;
   float proj;
-  ArrayList<Line> removeLines;
+  ArrayList<PhysicalLine> removePhysicalLines;
+  ArrayList<SceneryLine> removeSceneryLines;
+  ArrayList<Powerup> removePowerups;
 
   Eraser_Tool(int _x, int _y, int _w, int _h, boolean _active) {
     super(_x, _y, _w, _h, _active); 
     clickField.setImage("eraserTool.png");
-    removeLines = new ArrayList<Line>();
+    removePhysicalLines = new ArrayList<PhysicalLine>();
+    removeSceneryLines = new ArrayList<SceneryLine>();
+    removePowerups = new ArrayList<Powerup>();
   }
 
   void update() {
     super.update();
 
     if (mouseX > 50 && mouseY < height-50) 
-      status = "Erase around point: (" + str(int((mouseX/cameraZoom)-cameraOffsetX)) + "," + str(int((mouseY/cameraZoom)-cameraOffsetY)) + ")";
+      status = "Erase around point: (" + cursorX + "," + cursorY + ")";
   }
 
   void draw() {
@@ -225,28 +236,40 @@ class Eraser_Tool extends SquareTool {
     ellipse(correctedMouseX, correctedMouseY, eraserSize*cameraZoom, eraserSize*cameraZoom);
   }
 
-  void doMouseDown(int _x, int _y) {
+  void doMouseDragged(int _x, int _y) {
 
     if (activeLineTypes[0]) {
       for (PhysicalLine i : environment.getAllPhysicalLines ()) {
         if (circleLineCollision(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), eraserSize/2, i.points)) 
-          removeLines.add(i);
+          removePhysicalLines.add(i);
       }
     }
     if (activeLineTypes[1]) {
       for (SceneryLine i : environment.getAllSceneryLines ()) {
         if (circleLineCollision(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), eraserSize/2, i.points)) 
-          removeLines.add(i);
+          removeSceneryLines.add(i);
       }
     }
     if (activeLineTypes[2]) {
-      //remove powerups
+      for (Powerup i : environment.getAllPowerups ()) {
+        if (circleCircleCollision(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), eraserSize/2, i.posX, i.posY, int(i.size/cameraZoom))) {
+          removePowerups.add(i);
+        }
+      }
     }
 
-    for (Line i : removeLines) {
-      environment.removeLine(i.points, activeLineTypes);
+    for (PhysicalLine i : removePhysicalLines) {
+      environment.removeLine(i.points, activeLineTypes, true);
     }
-    removeLines.clear();
+    for (SceneryLine i : removeSceneryLines) {
+      environment.removeLine(i.points, activeLineTypes, true);
+    }
+    for (Powerup i : removePowerups) {
+      environment.removePowerup(i.posX, i.posY, i.angle, i.type, true);
+    }
+    removePhysicalLines.clear();
+    removeSceneryLines.clear();
+    removePowerups.clear();
   }
 
   private boolean circleLineCollision(int _cx, int _cy, float _r, int[] _linePoints) {
@@ -271,6 +294,187 @@ class Eraser_Tool extends SquareTool {
         return true;
     }
     return false;
+  }
+
+  private boolean circleCircleCollision(int _x1, int _y1, int _r1, int _x2, int _y2, int _r2) {
+    if (sqrt(sq(_x2-_x1) + sq(_y2-_y1)) <= _r1 + _r2)
+      return true;
+    return false;
+  }
+}
+
+//----------------------------------------------------------------------\\
+
+// // // // // // // // // // POWER UP CLASS \\ \\ \\ \\ \\ \\ \\ \\ \\ \\
+
+//----------------------------------------------------------------------\\
+
+class Powerup_Tool extends SquareTool {
+
+  SquareTool[] powerupTypes;
+  byte currentType;
+
+  Powerup_Tool (int _x, int _y, int _w, int _h, boolean _active) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    powerupTypes = new SquareTool[7];
+    powerupTypes[0] = new PUGoal_Tool(x + w, y, w, h, true, 'T');
+    powerupTypes[1] = new PUBoost_Tool(x + w, y + h, w, h, true, 'B');
+    powerupTypes[2] = new PUGravity_Tool(x + w, y + 2*h, w, h, true, 'G');
+    powerupTypes[3] = new PUSlowMo_Tool(x + w, y + 3*h, w, h, true, 'S');
+    powerupTypes[4] = new PUBomb_Tool(x + w, y + 4*h, w, h, true, 'O');
+    powerupTypes[5] = new PUCheckpoint_Tool(x + w, y + 5*h, w, h, true, 'C');
+    powerupTypes[6] = new PUVehicle_Tool(x + w, y + 6*h, w, h, true, 'V');  
+
+    currentType = 0;
+  }
+
+  void update() {
+    super.update();
+    for (SquareTool i : powerupTypes) {
+      i.update();
+    }
+  }
+
+  void draw() {
+    stroke(200);
+    fill(240, 200);
+    rect(x + w, y, w, h*powerupTypes.length);
+
+    for (SquareTool i : powerupTypes) {
+      i.displayImage();
+    }
+    powerupTypes[currentType].draw();
+  }
+
+  void doClick(int _x, int _y) {
+    for (int i = 0; i < powerupTypes.length; i++) {
+      if (powerupTypes[i].isClicked(_x, _y)) {
+        currentType = byte(i);
+        return;
+      }
+    }
+    powerupTypes[currentType].doClick(_x, _y);
+  }
+}
+
+class PUGoal_Tool extends SquareTool {
+  char type;
+  PUGoal_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0, 150);
+    fill(255, 255, 0, 150);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUBoost_Tool extends SquareTool {
+  char type;
+  PUBoost_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0);
+    fill(0, 255, 0);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUGravity_Tool extends SquareTool {
+  char type;
+  PUGravity_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0);
+    fill(0, 170, 255);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUSlowMo_Tool extends SquareTool {
+  char type;
+  PUSlowMo_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0);
+    fill(225);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUBomb_Tool extends SquareTool {
+  char type;
+  PUBomb_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0);
+    fill(255, 0, 0);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUCheckpoint_Tool extends SquareTool {
+  char type;
+  PUCheckpoint_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0);
+    fill(0, 0, 255);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
+  }
+}
+class PUVehicle_Tool extends SquareTool {
+  char type;
+  PUVehicle_Tool(int _x, int _y, int _w, int _h, boolean _active, char _type) {
+    super(_x, _y, _w, _h, _active);
+    clickField.setImage("powerupTool.png");
+    type = _type;
+  } 
+  void draw() {
+    strokeWeight(2*cameraZoom);
+    stroke(0, 150);
+    fill(255, 160, 0, 150);
+    ellipse(correctedMouseX, correctedMouseY, 15*cameraZoom, 15*cameraZoom);
+  }
+  void doClick(int _x, int _y) {
+    environment.addPowerup(int((_x/cameraZoom)-cameraOffsetX), int((_y/cameraZoom)-cameraOffsetY), 0, type, true);
   }
 }
 
@@ -417,7 +621,7 @@ class ImportExport_Tool {
   RectButton[] internalButtons;
   String[] internalButtonText;
 
-  int x, y, w, h;
+  int x, y, w, h, offset = 10;
   boolean importingOrExporting;
 
   ImportExport_Tool(int _x, int _y, int _w, int _h, int _ibx, int _iby, int _ibw, int _ibh, boolean _initialState, PImage _image) {
@@ -430,7 +634,7 @@ class ImportExport_Tool {
     clickField = new RectButton(x, y, w, h, true, _image);
     internalButtons = new RectButton[4];
     for (int i = 0; i < internalButtons.length; i++) {
-      internalButtons[i] = new RectButton(_ibx, _iby + i*(_ibh+10), _ibw, _ibh, true);
+      internalButtons[i] = new RectButton(_ibx, _iby + i*(_ibh+10) + offset, _ibw, _ibh, true);
     }
     internalButtonText = new String[internalButtons.length];
     internalButtonText[0] = "Import";
@@ -449,6 +653,9 @@ class ImportExport_Tool {
     clickField.draw();
     if (!importingOrExporting)
       return;
+    noStroke();
+    fill(227, 230, 255);
+    rect(internalButtons[0].x, internalButtons[0].y - offset, internalButtons[0].w + 25, height/2);
     strokeWeight(2);
     stroke(200);
     fill(240, 200);
@@ -471,6 +678,18 @@ class ImportExport_Tool {
     return false;
   }
 
+  void doInternalClick(int _x, int _y) {
+    if (internalButtons[0].isClicked(_x, _y))
+      environment.setTrackData(join(txtBox.getTextAsArray(), " "));
+    else if (internalButtons[1].isClicked(_x, _y))
+      txtBox.setText(environment.getTrackData());
+    else if (internalButtons[2].isClicked(_x, _y)) {
+      txtBox.setText("");
+      environment.setTrackData("");
+    } else if (internalButtons[3].isClicked(_x, _y))
+      importingOrExporting = false;
+  }
+
   void setImportingExporting(boolean _i) {
     importingOrExporting = _i;
   }
@@ -478,13 +697,3 @@ class ImportExport_Tool {
     return importingOrExporting;
   }
 }
-
-
-
-
-
-
-
-
-
-
