@@ -8,7 +8,7 @@ Future updates:
   - Add individual icons to each of the powerups.
   - Find a way to properly add the gravity and boost (arrow) powerups.
   - Add the curved line tool.
-  - Possible add the biker.
+  - Possibly add the biker.
 
 Libraries used: 
   - G4P - written by Peter Lager
